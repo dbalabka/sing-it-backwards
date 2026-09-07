@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#15122b" />
+    <meta name="description" content="Record a song and hear it played backwards." />
+    <title>Sing It Backwards</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header>
+        <p class="eyebrow">A tiny vocal time machine</p>
+        <h1>Sing it<br /><span>backwards.</span></h1>
+        <p class="intro">Record a line. Flip it. Learn the strange phonetics of a song in reverse.</p>
+      </header>
+
+      <section class="recorder" aria-labelledby="recorder-heading">
+        <div class="recorder-topline">
+          <h2 id="recorder-heading">Your take</h2>
+          <label class="duration-label" for="duration">
+            Limit
+            <select id="duration" aria-label="Recording duration limit">
+              <option value="15">15 sec</option>
+              <option value="30">30 sec</option>
+              <option value="60" selected>60 sec</option>
+              <option value="300">5 min</option>
+              <option value="0">Unlimited</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="waveform-wrap" aria-label="Audio waveform">
+          <canvas id="waveform" width="960" height="260"></canvas>
+          <div id="waveform-empty" class="waveform-empty">Your waveform will appear here</div>
+          <div id="timer" class="timer" aria-live="polite">00:00</div>
+        </div>
+
+        <p id="status" class="status" role="status" aria-live="polite">Ready when you are.</p>
+
+        <div class="controls" aria-label="Recording controls">
+          <button id="record" class="control record" type="button">
+            <span class="record-dot" aria-hidden="true"></span>
+            <span class="button-label">Record</span>
+          </button>
+          <button id="play" class="control" type="button" disabled>
+            <span aria-hidden="true">▶</span><span>Play</span>
+          </button>
+          <button id="reverse-play" class="control reverse" type="button" disabled>
+            <span aria-hidden="true">↶</span><span>Reverse play</span>
+          </button>
+        </div>
+      </section>
+
+      <p class="privacy-note">Your recordings stay on this device. Nothing is uploaded.</p>
+    </main>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
