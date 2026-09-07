@@ -4,55 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#15122b" />
-    <meta name="description" content="Record a song and hear it played backwards." />
+    <meta name="description" content="A guided two-player game for singing a line backwards." />
     <title>Sing It Backwards</title>
+    <script>document.documentElement.dataset.theme = localStorage.getItem("sing-it-backwards-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");</script>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="app-shell">
       <header>
-        <p class="eyebrow">A tiny vocal time machine</p>
+        <div class="header-topline"><p class="eyebrow">A tiny vocal time machine</p><label class="appearance-label" for="appearance">Appearance <select id="appearance"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label></div>
         <h1>Sing it<br /><span>backwards.</span></h1>
-        <p class="intro">Record a line. Flip it. Learn the strange phonetics of a song in reverse.</p>
+        <p class="intro">A two-player phonetic puzzle: hear a line reversed, sing what you hear, then discover whether the words come back.</p>
       </header>
-
-      <section class="recorder" aria-labelledby="recorder-heading">
-        <div class="recorder-topline">
-          <h2 id="recorder-heading">Your take</h2>
-          <label class="duration-label" for="duration">
-            Limit
-            <select id="duration" aria-label="Recording duration limit">
-              <option value="15">15 sec</option>
-              <option value="30">30 sec</option>
-              <option value="60" selected>60 sec</option>
-              <option value="300">5 min</option>
-              <option value="0">Unlimited</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="waveform-wrap" aria-label="Audio waveform">
-          <canvas id="waveform" width="960" height="260"></canvas>
-          <div id="waveform-empty" class="waveform-empty">Your waveform will appear here</div>
-          <div id="timer" class="timer" aria-live="polite">00:00</div>
-        </div>
-
-        <p id="status" class="status" role="status" aria-live="polite">Ready when you are.</p>
-
-        <div class="controls" aria-label="Recording controls">
-          <button id="record" class="control record" type="button">
-            <span class="record-dot" aria-hidden="true"></span>
-            <span class="button-label">Record</span>
-          </button>
-          <button id="play" class="control" type="button" disabled>
-            <span aria-hidden="true">▶</span><span>Play</span>
-          </button>
-          <button id="reverse-play" class="control reverse" type="button" disabled>
-            <span aria-hidden="true">↶</span><span>Reverse play</span>
-          </button>
-        </div>
+      <section class="game" aria-labelledby="game-heading">
+        <div class="game-topline"><h2 id="game-heading">Take turns</h2><label class="duration-label" for="duration">Limit <select id="duration" aria-label="Recording duration limit"><option value="15">15 sec</option><option value="30">30 sec</option><option value="60" selected>60 sec</option><option value="300">5 min</option><option value="0">Unlimited</option></select></label></div>
+        <ol class="steps">
+          <li class="step-card is-ready" data-step="1"><div class="step-number">1</div><div class="step-content"><h3>Player 1: record the original line</h3><p>Sing one short line clearly. It stays on this device.</p><div class="waveform-wrap" aria-label="Player 1 audio waveform"><canvas id="waveform-player1" width="960" height="200"></canvas><div id="waveform-empty-player1" class="waveform-empty">Player 1’s waveform will appear here</div><div id="timer-player1" class="timer" aria-live="polite">00:00</div></div><button data-record="player1" class="control record" type="button"><span class="record-dot" aria-hidden="true"></span><span class="button-label">Record</span></button></div></li>
+          <li class="step-card" data-step="2"><div class="step-number">2</div><div class="step-content"><h3>Player 2: learn the phonetics</h3><p>Listen to Player 1’s line backwards. Replay it as often as you need.</p><button id="listen-first" class="control reverse" type="button" disabled><span aria-hidden="true">↶</span> Play Player 1 backwards</button></div></li>
+          <li class="step-card" data-step="3"><div class="step-number">3</div><div class="step-content"><h3>Player 2: sing what you heard</h3><p>Record your best backwards performance. Recording again replaces only this attempt.</p><div class="waveform-wrap" aria-label="Player 2 audio waveform"><canvas id="waveform-player2" width="960" height="200"></canvas><div id="waveform-empty-player2" class="waveform-empty">Player 2’s waveform will appear here</div><div id="timer-player2" class="timer" aria-live="polite">00:00</div></div><button data-record="player2" class="control record" type="button" disabled><span class="record-dot" aria-hidden="true"></span><span class="button-label">Record</span></button></div></li>
+          <li class="step-card" data-step="4"><div class="step-number">4</div><div class="step-content"><h3>Player 2: hear the restored words</h3><p>Play your take backwards, then make your guess.</p><button id="listen-second" class="control reverse" type="button" disabled><span aria-hidden="true">↶</span> Play Player 2 backwards</button></div></li>
+          <li class="step-card" data-step="5"><div class="step-number">5</div><div class="step-content"><h3>Give up? Reveal the original</h3><p>Hear Player 1’s original line normally. Both takes remain available to replay above.</p><button id="reveal" class="control" type="button" disabled><span aria-hidden="true">▶</span> Reveal original</button></div></li>
+        </ol>
+        <p id="status" class="status" role="status" aria-live="polite">Loading your round…</p><button id="new-round" class="new-round" type="button">New round</button>
       </section>
-
       <p class="privacy-note">Your recordings stay on this device. Nothing is uploaded.</p>
     </main>
     <script type="module" src="app.js"></script>
