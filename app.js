@@ -15,6 +15,13 @@ let mediaRecorder, stream, chunks = [], activeTake, audioContext, currentSource,
 function setStatus(message, error = false) { status.textContent = message; status.classList.toggle("error", error); }
 function formatTime(ms) { const s = Math.floor(ms / 1000); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; }
 function context() { return audioContext || (audioContext = new (window.AudioContext || window.webkitAudioContext)()); }
+function setAudioSession(type) {
+  // Safari maps these web session intents to iOS audio-session behavior. Browsers
+  // without the experimental API simply keep their default audio behavior.
+  try {
+    if (navigator.audioSession) navigator.audioSession.type = type;
+  } catch { /* The browser controls whether this request may be honored. */ }
+}
 function supportedMimeType() { return !window.MediaRecorder ? "" : ["audio/webm;codecs=opus", "audio/mp4", "audio/webm", "audio/ogg;codecs=opus"].find((type) => MediaRecorder.isTypeSupported(type)) || ""; }
 function canvas(take) { return document.querySelector(`#waveform-${take}`); }
 function empty(take) { return document.querySelector(`#waveform-empty-${take}`); }
@@ -53,7 +60,7 @@ function stopRecording() { if (mediaRecorder?.state === "recording") mediaRecord
 async function startRecording(take) {
   if (take === TAKES.player2 && !recordings.player1) return;
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder || !(window.AudioContext || window.webkitAudioContext)) return setStatus("This browser cannot record audio here. Try a current browser.", true);
-  try { currentSource?.stop(); stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const mimeType = supportedMimeType(); mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream); activeTake = take; chunks = []; mediaRecorder.ondataavailable = ({ data }) => { if (data.size) chunks.push(data); }; mediaRecorder.onstop = finishRecording; mediaRecorder.start(); startedAt = Date.now(); timer(take).textContent = "00:00"; timerInterval = setInterval(() => { timer(take).textContent = formatTime(Date.now() - startedAt); }, 200); const limit = Number(durationSelect.value); if (limit) stopTimeout = setTimeout(stopRecording, limit * 1000); setStatus(limit ? `Recording ${take === TAKES.player1 ? "Player 1" : "Player 2"} — stops in ${limit} seconds.` : "Recording — press Stop when you are done."); updateInterface(); }
+  try { currentSource?.stop(); setAudioSession("play-and-record"); stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const mimeType = supportedMimeType(); mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream); activeTake = take; chunks = []; mediaRecorder.ondataavailable = ({ data }) => { if (data.size) chunks.push(data); }; mediaRecorder.onstop = finishRecording; mediaRecorder.start(); startedAt = Date.now(); timer(take).textContent = "00:00"; timerInterval = setInterval(() => { timer(take).textContent = formatTime(Date.now() - startedAt); }, 200); const limit = Number(durationSelect.value); if (limit) stopTimeout = setTimeout(stopRecording, limit * 1000); setStatus(limit ? `Recording ${take === TAKES.player1 ? "Player 1" : "Player 2"} — stops in ${limit} seconds.` : "Recording — press Stop when you are done."); updateInterface(); }
   catch (error) { setStatus(error.name === "NotAllowedError" ? "Microphone permission was denied. Allow it in your browser settings and try again." : "Could not access your microphone. Check it is connected and available.", true); }
 }
 async function finishRecording() {
@@ -67,6 +74,7 @@ async function play(take, reverse, message) {
   try {
     currentSource?.stop();
     setStatus(message);
+    setAudioSession("playback");
     // iOS Safari only permits an AudioContext to be resumed while the tap is active.
     // Do this before waiting for IndexedDB audio to decode.
     const audio = context();
