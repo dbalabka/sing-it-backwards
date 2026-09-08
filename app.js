@@ -5,6 +5,7 @@ const DURATION_KEY = "sing-it-backwards-duration";
 const THEME_KEY = "sing-it-backwards-theme";
 const recordings = { player1: null, player2: null };
 const durationSelect = document.querySelector("#duration");
+const reverseModeSelect = document.querySelector("#reverse-mode");
 const themeSelect = document.querySelector("#appearance");
 const status = document.querySelector("#status");
 const cards = [...document.querySelectorAll(".step-card")];
@@ -54,7 +55,7 @@ function updateInterface() {
   cards.forEach((card) => { const step = Number(card.dataset.step); card.classList.toggle("is-ready", step === 1 || ((step === 2 || step === 3 || step === 5) && first) || (step === 4 && second)); });
   document.querySelector("#listen-first").disabled = !first || recording; document.querySelector("#listen-second").disabled = !second || recording; document.querySelector("#reveal").disabled = !first || recording;
   recordButtons.forEach((button) => { const take = button.dataset.record, isActive = recording && activeTake === take; button.disabled = (take === TAKES.player1 && first) || (take === TAKES.player2 && !first) || (recording && !isActive); button.classList.toggle("is-recording", isActive); button.querySelector(".button-label").textContent = isActive ? "Stop recording" : (take === TAKES.player2 && second ? "Record Player 2 again" : "Record"); });
-  durationSelect.disabled = recording;
+  durationSelect.disabled = recording; reverseModeSelect.disabled = recording;
 }
 function stopRecording() { if (mediaRecorder?.state === "recording") mediaRecorder.stop(); }
 async function startRecording(take) {
@@ -69,6 +70,65 @@ async function finishRecording() {
   setStatus("Saving this take…");
   try { await store(take, blob); recordings[take] = blob; drawWaveform(take, await decode(blob)); setStatus(take === TAKES.player1 ? "Player 1 is saved. Player 2, listen to it backwards." : "Player 2 is saved. Play it backwards to hear the restored words."); } catch { setStatus("The recording could not be saved or decoded on this device.", true); } updateInterface();
 }
+function percentile(values, fraction) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.round((sorted.length - 1) * fraction)))];
+}
+function reverseChunks(buffer, createBuffer) {
+  const { length, numberOfChannels, sampleRate } = buffer;
+  const output = createBuffer(numberOfChannels, length, sampleRate);
+  if (!length || !numberOfChannels) return output;
+
+  const frameLength = Math.max(1, Math.round(sampleRate * 0.02));
+  const levels = [];
+  for (let start = 0; start < length; start += frameLength) {
+    const end = Math.min(length, start + frameLength);
+    let sum = 0;
+    for (let channel = 0; channel < numberOfChannels; channel += 1) {
+      const samples = buffer.getChannelData(channel);
+      for (let sample = start; sample < end; sample += 1) sum += samples[sample] ** 2;
+    }
+    levels.push(Math.sqrt(sum / ((end - start) * numberOfChannels)));
+  }
+  const quietThreshold = Math.min(0.08, Math.max(0.008, percentile(levels, 0.1) + (percentile(levels, 0.9) - percentile(levels, 0.1)) * 0.2));
+  const pauses = [];
+  let quietStart = null;
+  for (let frame = 0; frame <= levels.length; frame += 1) {
+    if (frame < levels.length && levels[frame] <= quietThreshold) {
+      if (quietStart === null) quietStart = frame;
+      continue;
+    }
+    if (quietStart !== null && frame - quietStart >= 3) pauses.push(Math.round(((quietStart * frameLength) + Math.min(length, frame * frameLength)) / 2));
+    quietStart = null;
+  }
+
+  const minimum = Math.round(sampleRate);
+  const target = Math.round(sampleRate * 2);
+  const maximum = Math.round(sampleRate * 5);
+  const boundaries = [0];
+  while (length - boundaries[boundaries.length - 1] > maximum) {
+    const start = boundaries[boundaries.length - 1];
+    const latest = Math.min(start + maximum, length - minimum);
+    const candidates = pauses.filter((pause) => pause >= start + minimum && pause <= latest);
+    const boundary = candidates.length ? candidates.reduce((best, pause) => {
+      const distance = Math.abs(pause - (start + target));
+      const bestDistance = Math.abs(best - (start + target));
+      return distance < bestDistance || (distance === bestDistance && pause > best) ? pause : best;
+    }) : latest;
+    boundaries.push(boundary);
+  }
+  boundaries.push(length);
+
+  for (let channel = 0; channel < numberOfChannels; channel += 1) {
+    const input = buffer.getChannelData(channel), transformed = output.getChannelData(channel);
+    for (let chunk = 0; chunk < boundaries.length - 1; chunk += 1) {
+      const start = boundaries[chunk], end = boundaries[chunk + 1];
+      for (let sample = start; sample < end; sample += 1) transformed[sample] = input[end - 1 - (sample - start)];
+    }
+  }
+  return output;
+}
 async function play(take, reverse, message) {
   if (!recordings[take]) return;
   try {
@@ -79,8 +139,10 @@ async function play(take, reverse, message) {
     // Do this before waiting for IndexedDB audio to decode.
     const audio = context();
     if (audio.state !== "running") await audio.resume();
-    const buffer = await decode(recordings[take]);
-    if (reverse) for (let i = 0; i < buffer.numberOfChannels; i += 1) buffer.getChannelData(i).reverse();
+    const decoded = await decode(recordings[take]);
+    let buffer = decoded;
+    if (reverse && reverseModeSelect.checked) buffer = reverseChunks(decoded, audio.createBuffer.bind(audio));
+    else if (reverse) for (let channel = 0; channel < decoded.numberOfChannels; channel += 1) decoded.getChannelData(channel).reverse();
     const source = audio.createBufferSource(); currentSource = source; source.buffer = buffer; source.connect(audio.destination); source.onended = () => { if (currentSource === source) { currentSource = null; setStatus("Ready for the next turn."); } }; source.start();
   } catch { setStatus("This recording could not be played in this browser.", true); }
 }
